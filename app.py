@@ -117,19 +117,17 @@ def extract_pdf_text(pdf_bytes):
         reader = PdfReader(BytesIO(pdf_bytes))
         text = ""
 
-        # Read only the first 40 pages to avoid long loading times.
-        for page in reader.pages[:40]:
+        for page_number, page in enumerate(reader.pages):
             page_text = page.extract_text()
             if page_text:
+                text += f"\n--- Page {page_number + 1} ---\n"
                 text += page_text + "\n"
 
-            if len(text) >= 20000:
-                break
-
-        return text[:20000]
+        return text
 
     except Exception as e:
-        return f"PDF reading error: {e}"
+        return f"Error reading PDF: {e}"
+    
 
 
 def get_textbook():
@@ -137,7 +135,7 @@ def get_textbook():
         return ""
 
     with st.spinner("Reading the selected textbook..."):
-        def extract_pdf_text(selected_file.getvalue())
+        def extract_pdf_text(pdf_bytes):
 
 
 # ---------------- STUDY DETAILS ----------------
