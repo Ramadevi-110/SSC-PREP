@@ -136,7 +136,20 @@ def get_textbook():
 
     with st.spinner("Reading the selected textbook..."):
         def extract_pdf_text(pdf_bytes):
+    try:
+        reader = PdfReader(BytesIO(pdf_bytes))
+        text = ""
 
+        for page_number, page in enumerate(reader.pages):
+            page_text = page.extract_text()
+            if page_text:
+                text += f"\n--- Page {page_number + 1} ---\n"
+                text += page_text + "\n"
+
+        return text
+
+    except Exception as e:
+        return f"Error reading PDF: {e}"
 
 # ---------------- STUDY DETAILS ----------------
 st.sidebar.header("🎯 Study Details")
