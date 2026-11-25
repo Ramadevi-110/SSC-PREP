@@ -1,14 +1,11 @@
 
-import os
-import urllib.parse
-from pathlib import Path
-
 import streamlit as st
-from groq import Groq
+import os
+from io import BytesIO
 from pypdf import PdfReader
+from groq import Groq
 
-# ---------------- PAGE CONFIG ----------------
-
+# ---------------- PAGE SETUP ----------------
 st.set_page_config(
     page_title="SSC PREP AI",
     page_icon="📚",
@@ -18,440 +15,294 @@ st.set_page_config(
 st.title("📚 SSC PREP AI")
 st.caption("Your Personal Telangana SSC Class 10 Study Assistant")
 
-# ---------------- SETTINGS ----------------
+# ---------------- API CONNECTION ----------------
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+except Exception:
+    api_key = os.getenv("GROQ_API_KEY")
 
-TEXTBOOK_DIR = Path("textbooks")
-TEXTBOOK_DIR.mkdir(exist_ok=True)
+def ask_ai(prompt, textbook=""):
+    if not api_key:
+        st.error("Please add GROQ_API_KEY in Streamlit Secrets.")
+        return None
 
-SUBJECTS = [
-    "Mathematics",
-    "Physical Science",
-    "Biological Science",
-    "Social Studies",
-    "English",
-    "Telugu",
-    "Hindi"
-]
+    try:
+        client = Groq(api_key=api_key)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                    You are SSC PREP AI, a study assistant for Telangana
+                    State Class 10 students.
 
-MODEL = "llama-3.3-70b-versatile"
+                    Follow the Telangana SSC/SCERT textbook wherever
+                    textbook content is provided.
 
-# ---------------- AI CONNECTION ----------------
+                    Use the exact textbook terminology and topic order.
+                    Make notes medium-length, clear and copyable.
+                    Include important definitions, examples, formulas,
+                    tables, simple labelled diagrams and flowcharts
+                    wherever relevant.
 
-api_key = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY"))
-
-if not api_key:
-    st.error("Please add GROQ_API_KEY in Streamlit Secrets.")
-    st.stop()
-
-client = Groq(api_key=api_key)
-
-
-def ask_ai(prompt, textbook_text=""):
-    context = textbook_text[:18000]
-
-    system_prompt = """
-You are SSC PREP AI, a careful tutor for Telangana SSC Class 10.
-
-Follow these rules:
-1. Use Telangana SCERT Class 10 terminology.
-2. Never invent textbook facts or headings.
-3. Preserve the textbook's order and terminology.
-4. Separate textbook-supported information from extra explanations.
-5. Explain difficult concepts in simple English.
-6. Use readable headings, bullet points and tables.
-7. Include simple labelled diagram instructions when useful.
-8. If the supplied textbook does not contain the requested
-   information, clearly say so.
-9. Do not claim that supplementary information is from
-   the textbook.
-"""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {
-            "role": "user",
-            "content": f"""
-TEXTBOOK MATERIAL:
-{context if context else "No textbook PDF supplied."}
-
-STUDENT REQUEST:
-{prompt}
-"""
-        }
-    ]
-
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        temperature=0.3
-    )
-
-    return response.choices[0].message.content
-
-
-# ---------------- PDF READER ----------------
-
-def extract_pdf(uploaded_file):
-    reader = PdfReader(uploaded_file)
-    pages = []
-
-    for page in reader.pages:
-        pages.append(page.extract_text() or "")
-
-    return "\n".join(pages)
-
-
-def get_stored_text():
-    documents = []
-
-    for pdf in TEXTBOOK_DIR.glob("*.pdf"):
-        try:
-            reader = PdfReader(str(pdf))
-            for page in reader.pages:
-                documents.append(page.extract_text() or "")
-        except Exception:
-            continue
-
-    return "\n".join(documents)
-
-
-# ---------------- SIDEBAR ----------------
-
-with st.sidebar:
-    st.header("⚙️ My Study Profile")
-
-    subject = st.selectbox("Select Subject", SUBJECTS)
-
-    learning_style = st.selectbox(
-        "Preferred Learning Style",
-        [
-            "Simple explanations with examples",
-            "Step-by-step explanations",
-            "Visual descriptions and diagrams",
-            "Exam-focused bullet points"
-        ]
-    )
-
-    level = st.selectbox(
-        "My Current Level",
-        [
-            "Teach me from zero",
-            "I know the basics",
-            "I am ready for revision"
-        ]
-    )
-
-    st.divider()
-
-    st.subheader("📚 Textbook Library")
-
-    uploaded_pdfs = st.file_uploader(
-        "Upload SSC textbook PDFs",
-        type=["pdf"],
-        accept_multiple_files=True
-    )
-
-    if uploaded_pdfs:
-        for pdf in uploaded_pdfs:
-            safe_name = Path(pdf.name).name
-            save_path = TEXTBOOK_DIR / safe_name
-
-            if not save_path.exists():
-                with open(save_path, "wb") as file:
-                    file.write(pdf.getvalue())
-
-        st.success("PDFs saved for this app session.")
-
-    stored_text = get_stored_text()
-
-    if stored_text:
-        st.caption("Stored textbook material is available.")
-
-    st.info(
-        "For permanent textbook storage on GitHub, "
-        "add official PDF files to the textbooks folder."
-    )
-
-
-# ---------------- TEXTBOOK CONTEXT ----------------
-
-uploaded_text = ""
-
-if uploaded_pdfs:
-    selected_pdf = st.selectbox(
-        "Choose a PDF for this session",
-        ["No additional PDF"] + [p.name for p in uploaded_pdfs]
-    )
-
-    if selected_pdf != "No additional PDF":
-        selected_file = next(
-            p for p in uploaded_pdfs if p.name == selected_pdf
+                    Do not invent textbook facts. If information is
+                    missing from the provided textbook, say so.
+                    """
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "TEXTBOOK CONTENT:\n"
+                        + (textbook[:14000] if textbook else
+                           "No textbook content was selected.")
+                        + "\n\nREQUEST:\n" + prompt
+                    )
+                }
+            ],
+            temperature=0.3,
+            max_tokens=2500
         )
+        return response.choices[0].message.content
 
-        try:
-            uploaded_text = extract_pdf(selected_file)
-        except Exception:
-            st.warning("Could not read this PDF.")
+    except Exception as e:
+        st.error(f"AI error: {e}")
+        return None
 
-textbook_context = (
-    (stored_text + "\n" + uploaded_text).strip()
+
+# ---------------- TEXTBOOK UPLOAD ----------------
+st.sidebar.header("📚 Textbook Library")
+
+uploaded_files = st.sidebar.file_uploader(
+    "Upload your SSC textbooks (PDF)",
+    type=["pdf"],
+    accept_multiple_files=True
 )
 
+if uploaded_files:
+    st.sidebar.success(f"{len(uploaded_files)} textbook(s) uploaded.")
 
-# ---------------- MAIN LEARNING TABS ----------------
+    selected_file_name = st.sidebar.selectbox(
+        "Choose the textbook for this session",
+        [file.name for file in uploaded_files]
+    )
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    selected_file = next(
+        file for file in uploaded_files
+        if file.name == selected_file_name
+    )
+else:
+    selected_file = None
+    st.sidebar.info("Upload your textbook PDFs to use textbook-based answers.")
+
+
+# ---------------- PDF READING ----------------
+@st.cache_data(show_spinner=False)
+def extract_pdf_text(pdf_bytes):
+    try:
+        reader = PdfReader(BytesIO(pdf_bytes))
+        text = ""
+
+        # Read only the first 40 pages to avoid long loading times.
+        for page in reader.pages[:40]:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+
+            if len(text) >= 20000:
+                break
+
+        return text[:20000]
+
+    except Exception as e:
+        return f"PDF reading error: {e}"
+
+
+def get_textbook():
+    if selected_file is None:
+        return ""
+
+    with st.spinner("Reading the selected textbook..."):
+        return extract_pdf_text(selected_file.getvalue())
+
+
+# ---------------- STUDY DETAILS ----------------
+st.sidebar.header("🎯 Study Details")
+
+subject = st.sidebar.selectbox(
+    "Select Subject",
+    [
+        "Mathematics",
+        "Physical Science",
+        "Biological Science",
+        "Social Studies",
+        "English",
+        "Telugu",
+        "Other"
+    ]
+)
+
+chapter = st.sidebar.text_input("Chapter Name")
+topic = st.sidebar.text_input("Topic")
+subtopic = st.sidebar.text_input("Subtopic (optional)")
+
+# ---------------- TABS ----------------
+notes_tab, concept_tab, video_tab, doubt_tab, maths_tab, flash_tab = st.tabs([
     "📝 Generate Notes",
-    "🧠 Understand Concepts",
+    "💡 Understand Concepts",
     "🎥 Video Lessons",
-    "✍️ Ask Doubts",
-    "🧮 Maths Solver",
-    "🗂️ Flashcards"
+    "❓ Ask Doubts",
+    "➗ Maths Solver",
+    "🧠 Flashcards"
 ])
 
 
-# ---------------- TAB 1: NOTES ----------------
+# ---------------- GENERATE NOTES ----------------
+with notes_tab:
+    st.header("📝 Textbook-Based Notes")
 
-with tab1:
-    st.header("📝 SSC Notes Generator")
-
-    chapter = st.text_input(
-        "Chapter name",
-        key="notes_chapter"
-    )
-
-    topic = st.text_input(
-        "Topic or subtopic (optional)",
-        key="notes_topic"
-    )
-
-    if st.button("Generate Textbook Notes", key="notes_btn"):
+    if st.button("Generate Notes", key="notes"):
         if not chapter:
-            st.warning("Enter a chapter name.")
+            st.warning("Please enter a chapter name in Study Details.")
         else:
+            textbook = get_textbook()
             prompt = f"""
-Generate medium-length, directly copyable Telangana SSC
-Class 10 {subject} notes.
+            Prepare Telangana SSC Class 10 {subject} notes.
 
-Chapter: {chapter}
-Topic: {topic if topic else "Entire chapter"}
+            Chapter: {chapter}
+            Topic: {topic}
+            Subtopic: {subtopic}
 
-Follow the exact textbook headings and subheading order
-where the supplied material supports them.
-
-Include:
-- Important textbook facts
-- Definitions
-- Necessary labelled diagrams
-- Useful flowcharts
-- Important formulas and tables
-- Short revision cards
-
-Do not add unrelated information.
-
-Learning preference: {learning_style}
-
-Clearly separate the textbook notes from any supplementary
-explanation. Do not invent textbook section numbers.
-"""
-            with st.spinner("Preparing your notes..."):
-                try:
-                    result = ask_ai(prompt, textbook_context)
-                    st.markdown(result)
-                    st.download_button(
-                        "Download Notes",
-                        result,
-                        file_name="SSC_Notes.txt"
-                    )
-                except Exception as e:
-                    st.error(f"AI error: {e}")
+            Follow the textbook order. Include necessary diagrams,
+            flowcharts, tables, formulas and important points.
+            Keep the notes medium-length and directly copyable.
+            """
+            answer = ask_ai(prompt, textbook)
+            if answer:
+                st.markdown(answer)
+                st.download_button(
+                    "⬇️ Download Notes",
+                    answer,
+                    file_name="SSC_Notes.txt"
+                )
 
 
-# ---------------- TAB 2: CONCEPT EXPLAINER ----------------
-
-with tab2:
-    st.header("🧠 Understand Any Concept")
+# ---------------- UNDERSTAND CONCEPTS ----------------
+with concept_tab:
+    st.header("💡 Understand a Concept")
 
     concept = st.text_input(
-        "Which concept is difficult?",
-        key="concept_input"
+        "Which concept would you like explained?",
+        key="concept"
     )
 
-    if st.button("Explain This Concept"):
+    if st.button("Explain Concept"):
         if concept:
-            prompt = f"""
-Teach the Class 10 Telangana SSC concept: {concept}
-Subject: {subject}
-
-Student level: {level}
-Preferred style: {learning_style}
-
-First explain the textbook-supported concept.
-Then provide a separate section titled
-'Understand Better - Additional Explanation'.
-
-Use simple examples, analogies, step-by-step reasoning
-and visual descriptions wherever useful.
-"""
-            with st.spinner("Explaining the concept..."):
-                try:
-                    st.markdown(ask_ai(prompt, textbook_context))
-                except Exception as e:
-                    st.error(f"AI error: {e}")
+            textbook = get_textbook()
+            answer = ask_ai(
+                f"Explain {concept} from {subject}, chapter {chapter}. "
+                "Start from the basics with simple examples and "
+                "step-by-step explanations.",
+                textbook
+            )
+            if answer:
+                st.markdown(answer)
+        else:
+            st.warning("Enter a concept first.")
 
 
-# ---------------- TAB 3: VIDEO FINDER ----------------
-
-with tab3:
-    st.header("🎥 Video Learning Centre")
+# ---------------- VIDEO LESSONS ----------------
+with video_tab:
+    st.header("🎥 Find Video Lessons")
 
     video_topic = st.text_input(
-        "Enter chapter or concept",
-        key="video_topic"
+        "Enter the chapter or concept",
+        key="video"
     )
 
-    language = st.selectbox(
-        "Video language",
-        ["English", "Telugu", "Telugu + English"]
-    )
-
-    if st.button("Find Video Lessons"):
+    if st.button("Find Videos"):
         if video_topic:
+            import urllib.parse
             search = urllib.parse.quote(
-                f"Telangana SSC Class 10 {video_topic} "
-                f"{language} animated explanation"
+                "Telangana SSC Class 10 " + subject + " " + video_topic
             )
-
-            url = (
-                "https://www.youtube.com/results?search_query="
-                + search
-            )
-
             st.link_button(
-                "▶️ Search Educational Videos",
-                url
+                "▶️ Search YouTube Lessons",
+                "https://www.youtube.com/results?search_query=" + search
             )
-
-            st.caption(
-                "Check that the selected video matches "
-                "your SSC syllabus."
-            )
+        else:
+            st.warning("Enter a topic first.")
 
 
-# ---------------- TAB 4: DOUBT SOLVER ----------------
+# ---------------- ASK DOUBTS ----------------
+with doubt_tab:
+    st.header("❓ Ask Your Doubt")
 
-with tab4:
-    st.header("✍️ Ask Your Doubts")
-
-    question = st.text_area(
-        "Paste your question here",
-        height=150
-    )
-
-    doubt_mode = st.radio(
-        "How should I help?",
-        [
-            "Explain from scratch",
-            "Step-by-step solution",
-            "SSC exam-style answer"
-        ]
+    doubt = st.text_area(
+        "Type your question here",
+        key="doubt"
     )
 
     if st.button("Solve My Doubt"):
-        if question.strip():
-            prompt = f"""
-Subject: {subject}
-Question: {question}
-
-Task: {doubt_mode}
-Learning level: {level}
-Learning style: {learning_style}
-
-Explain accurately and clearly.
-Use textbook context where available.
-"""
-            with st.spinner("Solving your doubt..."):
-                try:
-                    st.markdown(ask_ai(prompt, textbook_context))
-                except Exception as e:
-                    st.error(f"AI error: {e}")
+        if doubt:
+            textbook = get_textbook()
+            answer = ask_ai(
+                f"Answer this student's doubt about {subject}: {doubt}. "
+                "Explain clearly with examples.",
+                textbook
+            )
+            if answer:
+                st.markdown(answer)
+        else:
+            st.warning("Type your doubt first.")
 
 
-# ---------------- TAB 5: MATHS SOLVER ----------------
+# ---------------- MATHS SOLVER ----------------
+with maths_tab:
+    st.header("➗ Step-by-Step Maths Solver")
 
-with tab5:
-    st.header("🧮 Mathematics Step-by-Step Solver")
-
-    maths_question = st.text_area(
+    problem = st.text_area(
         "Enter your Maths problem",
-        height=120
+        key="math_problem"
     )
 
-    if st.button("Solve Maths Problem"):
-        if maths_question.strip():
-            prompt = f"""
-Solve this Class 10 Telangana SSC Maths problem:
-
-{maths_question}
-
-Requirements:
-1. Write the given information.
-2. Identify the formula or method.
-3. Solve step by step.
-4. Explain why each step is performed.
-5. Show the final answer clearly.
-6. Mention common calculation mistakes.
-"""
-            with st.spinner("Working through the problem..."):
-                try:
-                    st.markdown(ask_ai(prompt, textbook_context))
-                except Exception as e:
-                    st.error(f"AI error: {e}")
+    if st.button("Solve Step by Step"):
+        if problem:
+            answer = ask_ai(
+                "Solve this Class 10 Maths problem step by step. "
+                "Show the formula, substitution, calculations and final answer. "
+                "Check the calculations carefully.\n\n" + problem
+            )
+            if answer:
+                st.markdown(answer)
+        else:
+            st.warning("Enter a Maths problem first.")
 
 
-# ---------------- TAB 6: FLASHCARDS ----------------
+# ---------------- FLASHCARDS ----------------
+with flash_tab:
+    st.header("🧠 Revision Flashcards")
 
-with tab6:
-    st.header("🗂️ Quick Revision Cards")
-
-    flash_chapter = st.text_input(
-        "Enter chapter name",
-        key="flash_chapter"
+    flash_topic = st.text_input(
+        "Enter a chapter or topic",
+        key="flash"
     )
 
-    card_count = st.slider(
-        "Number of revision questions",
-        5, 20, 10
-    )
+    if st.button("Create Flashcards"):
+        if flash_topic:
+            textbook = get_textbook()
+            answer = ask_ai(
+                f"Create 10 question-and-answer revision flashcards "
+                f"for Telangana SSC Class 10 {subject}, "
+                f"chapter/topic: {flash_topic}. "
+                "Keep questions short and answers accurate.",
+                textbook
+            )
+            if answer:
+                st.markdown(answer)
+        else:
+            st.warning("Enter a chapter or topic first.")
 
-    if st.button("Create Revision Cards"):
-        if flash_chapter:
-            prompt = f"""
-Create {card_count} Class 10 Telangana SSC revision
-flashcards for {subject}, chapter: {flash_chapter}.
-
-Use textbook-supported information wherever available.
-
-Format:
-Question 1:
-Answer:
-
-Keep answers clear, concise and useful for revision.
-Add supplementary questions only in a separately
-marked section.
-"""
-            with st.spinner("Creating revision cards..."):
-                try:
-                    st.markdown(ask_ai(prompt, textbook_context))
-                except Exception as e:
-                    st.error(f"AI error: {e}")
-
-
-# ---------------- FOOTER ----------------
 
 st.divider()
-
-st.caption(
-    "SSC PREP AI | Telangana SSC Class 10 | "
-    "Learn • Understand • Revise • Improve"
-)
+st.caption("SSC PREP AI | Telangana SSC Class 10")
