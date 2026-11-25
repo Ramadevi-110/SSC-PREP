@@ -133,24 +133,23 @@ def extract_pdf_text(pdf_bytes):
 def get_textbook():
     if selected_file is None:
         return ""
-
     with st.spinner("Reading the selected textbook..."):
-        def extract_pdf_text(pdf_bytes):
-    try:
-        reader = PdfReader(BytesIO(pdf_bytes))
-        text = ""
+        try:
+            reader = PdfReader(BytesIO(selected_file.getvalue()))
+            text = ""
 
-        for page_number, page in enumerate(reader.pages):
-            page_text = page.extract_text()
-            if page_text:
-                text += f"\n--- Page {page_number + 1} ---\n"
-                text += page_text + "\n"
+            for page_number, page in enumerate(reader.pages):
+                page_text = page.extract_text()
+                if page_text:
+                    text += f"\n--- Page {page_number + 1} ---\n"
+                    text += page_text + "\n"
 
-        return text
+            return text
 
-    except Exception as e:
-        return f"Error reading PDF: {e}"
-
+        except Exception as e:
+            st.error(f"Error reading PDF: {e}")
+            return ""
+            
 # ---------------- STUDY DETAILS ----------------
 st.sidebar.header("🎯 Study Details")
 
