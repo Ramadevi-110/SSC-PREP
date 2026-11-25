@@ -42,9 +42,23 @@ def ask_ai(prompt, textbook=""):
 
                     Use the exact textbook terminology and topic order.
                     Make notes medium-length, clear and copyable.
-                    Include important definitions, examples, formulas,
-                    tables, simple labelled diagrams and flowcharts
-                    wherever relevant.
+                    Include visual elements according to the subject:
+
+- Biological Science: labelled diagrams, biological
+  processes and flowcharts.
+- Physical Science: equations, formulas, chemical
+  reactions and relevant diagrams.
+- Social Studies: maps, timelines, tables and
+  flowcharts wherever relevant.
+- Mathematics: formulas, graphs and worked examples.
+- English: grammar tables, writing formats and examples.
+- Telugu: grammar tables, meanings and literary details.
+
+Never force diagrams or flowcharts into a topic
+where they are not necessary.
+
+Follow the exact textbook order and terminology.
+Do not invent textbook content.
 
                     Do not invent textbook facts. If information is
                     missing from the provided textbook, say so.
