@@ -68,7 +68,7 @@ Do not invent textbook content.
                     "role": "user",
                     "content": (
                         "TEXTBOOK CONTENT:\n"
-                        + (textbook[:14000] if textbook else
+                        + (textbook if textbook else)
                            "No textbook content was selected.")
                         + "\n\nREQUEST:\n" + prompt
                     )
