@@ -67,11 +67,11 @@ Do not invent textbook content.
                 {
                     "role": "user",
                     "content": (
-                        "TEXTBOOK CONTENT:\n"
-                        + (textbook if textbook else)
-                           "No textbook content was selected.")
-                        + "\n\nREQUEST:\n" + prompt
-                    )
+    "TEXTBOOK CONTENT:\n"
+    + (textbook if textbook else
+       "No textbook content was selected.")
+    + "\n\nREQUEST:\n" + prompt
+)
                 }
             ],
             temperature=0.3,
