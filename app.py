@@ -161,13 +161,14 @@ topic = st.sidebar.text_input("Topic")
 subtopic = st.sidebar.text_input("Subtopic (optional)")
 
 # ---------------- TABS ----------------
-notes_tab, concept_tab, video_tab, doubt_tab, maths_tab, flash_tab = st.tabs([
+notes_tab, concept_tab, video_tab, doubt_tab, maths_tab, flash_tab = notes_tab, concept_tab, video_tab, doubt_tab, maths_tab, flash_tab, quiz_tab = st.tabs([
     "📝 Generate Notes",
     "💡 Understand Concepts",
     "🎥 Video Lessons",
     "❓ Ask Doubts",
     "➗ Maths Solver",
-    "🧠 Flashcards"
+    "🧠 Flashcards",
+    "🧠 MCQ Practice"
 ])
 
 
