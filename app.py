@@ -137,7 +137,7 @@ def get_textbook():
         return ""
 
     with st.spinner("Reading the selected textbook..."):
-        return extract_pdf_text(selected_file.getvalue())
+        def extract_pdf_text(selected_file.getvalue())
 
 
 # ---------------- STUDY DETAILS ----------------
